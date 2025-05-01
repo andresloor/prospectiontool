@@ -1,0 +1,37 @@
+version: "3.9"
+
+networks:
+  kafka-net:
+    driver: bridge                 # red puente local
+
+services:
+  prospection-backend1:
+    image: andresloorcracker/prospection-backend1
+    container_name: prospection-backend1
+
+    environment:
+      SQL: "Server=guuk.initiumsoft.com;Port=3306;Database=prospection_tool;Uid=prospection;Pwd=#initiumadm05#;SslMode=Preferred;"
+
+    ports:
+      - "32782:80"                 # host:contenedor (HTTP)
+
+    restart: always
+    networks:
+      - kafka-net
+
+  prospection_producer2:
+    image: andresloorcracker/prospection_producer2
+    container_name: prospection_producer2
+
+    environment:
+      CONNECTIONSTRINGS__SQL: "Server=guuk.initiumsoft.com;Port=3306;Database=prospection_tool;Uid=prospection;Pwd=#initiumadm05#;SslMode=Preferred;"
+      TIEMPOEJECUCIONMIN: "50"     # segundos entre ciclos del Worker
+
+    # expón este puerto solo si tu Worker publica algo por 91/TCP;
+    # si no, puedes eliminar la línea siguiente
+    ports:
+      - "32788:91"
+
+    restart: always
+    networks:
+      - kafka-net

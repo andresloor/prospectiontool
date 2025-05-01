@@ -1,0 +1,62 @@
+version: "3.8"
+
+services:
+  # ─────────────── ZooKeeper (stand-alone) ───────────────
+  zookeeper:
+    image: bitnami/zookeeper:3.9.1                        # usa bitnami, más simple
+    container_name: zookeeper
+    environment:
+      ALLOW_ANONYMOUS_LOGIN: "yes"                        # perfecto para tests
+    ports:
+      - "2181:2181"                                       # sólo el puerto cliente
+    networks:
+      - kafka-net
+
+  # ─────────────── Kafka 3.6 (con ZooKeeper) ─────────────
+  kafka:
+    image: bitnami/kafka:3.6.1-debian-11-r1
+    container_name: kafka
+    depends_on:
+      - zookeeper                                         # espera a que arranque
+    ports:
+      - "9092:9092"                                       # OUTSIDE
+      - "9093:9093"                                       # INTERNAL
+    environment:
+      # ----- ZooKeeper -----
+      KAFKA_CFG_ZOOKEEPER_CONNECT: "zookeeper:2181"
+      KAFKA_CFG_BROKER_ID: 1
+
+      # ----- listeners -----
+      ALLOW_PLAINTEXT_LISTENER: "yes"
+      KAFKA_CFG_LISTENERS: "INTERNAL://:9093,OUTSIDE://:9092"
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: "INTERNAL:PLAINTEXT,OUTSIDE:PLAINTEXT"
+      KAFKA_CFG_ADVERTISED_LISTENERS: "INTERNAL://kafka:9093,OUTSIDE://192.168.23.103:9092"
+      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: "INTERNAL"
+
+      # ----- single-node tweaks -----
+      KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR: 1
+    volumes:
+      - ./kafka_data:/bitnami/kafka
+    networks:
+      - kafka-net
+
+  # ─────────────── Kafka-UI ─────────────
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    depends_on:
+      - kafka
+    ports:
+      - "8084:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: "kafka:9093"     # listener interno
+      KAFKA_CLUSTERS_0_ZOOKEEPER: "zookeeper:2181"
+    networks:
+      - kafka-net
+
+networks:
+  kafka-net:
+    driver: bridge
